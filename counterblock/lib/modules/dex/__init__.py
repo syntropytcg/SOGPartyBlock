@@ -491,6 +491,10 @@ def get_markets_list(quote_asset = None, order_by=None):
     return dex.get_markets_list(quote_asset=quote_asset, order_by=order_by)
 
 @API.add_method
+def get_sog_markets_list(quote_asset = None, order_by=None):
+    return dex.get_sog_markets_list(quote_asset=quote_asset, order_by=order_by)
+
+@API.add_method
 def get_market_details(asset1, asset2, min_fee_provided=0.95, max_fee_required=0.95):
     return dex.get_market_details(asset1, asset2, min_fee_provided, max_fee_required)
 
