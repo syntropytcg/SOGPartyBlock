@@ -318,6 +318,7 @@ def get_market_orders(asset1, asset2, addresses=[], supplies=None, min_fee_provi
                 except:
                     continue
                 market_order['type'] = 'SELL'
+                market_order['quote_asset'] = quote_asset
                 market_order['amount'] = order['give_remaining']
                 market_order['total'] = D(order['give_remaining']) * D(price)
                 if not supplies[order['give_asset']][1] and supplies[order['get_asset']][1]:
@@ -332,6 +333,7 @@ def get_market_orders(asset1, asset2, addresses=[], supplies=None, min_fee_provi
                 except:
                     continue
                 market_order['type'] = 'BUY'
+                market_order['quote_asset'] = quote_asset
                 market_order['total'] = order['give_remaining']
                 market_order['amount'] = D(order['give_remaining']) / D(price)
                 if supplies[order['give_asset']][1] and not supplies[order['get_asset']][1]:
@@ -625,18 +627,18 @@ def get_sog_markets_list(quote_asset=None, order_by=None):
     yesterday = int(time.time() - (24*60*60))
     markets = []
     pairs = []
-    currencies = ['XCP', 'BITCRYSTALS'] if not quote_asset else [quote_asset]
+    currencies = ['BITCRYSTALS', 'XCP'] if not quote_asset else [quote_asset]
 
 
 
 
 
     # pairs with volume last 24h
-    pairs += get_quotation_pairs(exclude_pairs=[], max_pairs=500, from_time=yesterday, include_currencies=currencies)
+    pairs += get_quotation_pairs(exclude_pairs=[], max_pairs=100, from_time=yesterday, include_currencies=currencies)
     pair_with_volume = [p['pair'] for p in pairs]
 
     # pairs without volume last 24h
-    pairs += get_quotation_pairs(exclude_pairs=pair_with_volume, max_pairs=500 - len(pair_with_volume), include_currencies=currencies)
+    pairs += get_quotation_pairs(exclude_pairs=pair_with_volume, max_pairs=100, include_currencies=currencies)
 
     base_assets  = [p['base_asset'] for p in pairs]
     quote_assets  = [p['quote_asset'] for p in pairs]
@@ -644,42 +646,40 @@ def get_sog_markets_list(quote_asset=None, order_by=None):
     supplies = get_assets_supply(all_assets)
 
     asset_with_image = {}
-    if config.mongo_db:
-        infos = config.mongo_db.asset_extended_info.find({'asset': {'$in': all_assets}}, {'_id': 0}) or False
-        for info in infos:
-            if 'info_data' in info and 'valid_image' in info['info_data'] and info['info_data']['valid_image']:
-                asset_with_image[info['asset']] = True
+    counter = 0;
 
     for pair in pairs:
-        price, trend, price24h, progression = get_price_movement(pair['base_asset'], pair['quote_asset'], supplies=supplies)
-        market = {}
-        market['base_asset'] = pair['base_asset']
-        market['quote_asset'] = pair['quote_asset']
-        market['volume'] = pair['quote_quantity'] if pair['pair'] in pair_with_volume else 0
-        market['price'] = format(price, ".8f")
-        market['trend'] = trend
-        market['progression'] = format(progression, ".2f")
-        market['price_24h'] = format(price24h, ".8f")
-        market['supply'] = supplies[pair['base_asset']][0]
-        market['base_divisibility'] = supplies[pair['base_asset']][1]
-        market['quote_divisibility'] = supplies[pair['quote_asset']][1]
-        market['market_cap'] = format(D(market['supply']) * D(market['price']), ".4f")
-        market['with_image'] = True if pair['base_asset'] in asset_with_image else False
-        market_orders = []
-        buy_orders = []
-        sell_orders = []
-        asset1 = pair['base_asset']
-        asset2 = pair['quote_asset']
-        market_orders = get_market_orders(asset1, asset2)
-        for order in market_orders:
-          if order['type'] == 'SELL':
-             sell_orders.append(order)
-          elif order['type'] == 'BUY':
-             buy_orders.append(order)
-        market['buy_orders'] = buy_orders
-        market['sell_orders'] = sell_orders
-        if market['base_asset'] in sogassets or market['quote_asset'] in sogassets:
-            markets.append(market)
+        if counter < 50:
+            if pair['base_asset'] in sogassets or pair['quote_asset'] in sogassets:
+                counter += 1
+                price, trend, price24h, progression = get_price_movement(pair['base_asset'], pair['quote_asset'], supplies=supplies)
+                market = {}
+                market['base_asset'] = pair['base_asset']
+                market['quote_asset'] = pair['quote_asset']
+                market['volume'] = pair['quote_quantity'] if pair['pair'] in pair_with_volume else 0
+                market['price'] = format(price, ".8f")
+                market['trend'] = trend
+                market['progression'] = format(progression, ".2f")
+                market['price_24h'] = format(price24h, ".8f")
+                market['supply'] = supplies[pair['base_asset']][0]
+                market['base_divisibility'] = supplies[pair['base_asset']][1]
+                market['quote_divisibility'] = supplies[pair['quote_asset']][1]
+                market['market_cap'] = format(D(market['supply']) * D(market['price']), ".4f")
+                market['with_image'] = True if pair['base_asset'] in asset_with_image else False
+                market_orders = []
+                buy_orders = []
+                sell_orders = []
+                asset1 = pair['base_asset']
+                asset2 = pair['quote_asset']
+                market_orders = get_market_orders(asset1, asset2)
+                for order in market_orders:
+                  if order['type'] == 'SELL':
+                     sell_orders.append(order)
+                  elif order['type'] == 'BUY':
+                     buy_orders.append(order)
+                market['buy_orders'] = buy_orders
+                market['sell_orders'] = sell_orders
+                markets.append(market)
 
 
     if order_by in ['price', 'progression', 'supply', 'market_cap', 'volume']:
