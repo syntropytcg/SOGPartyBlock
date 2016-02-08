@@ -634,11 +634,8 @@ def get_sog_markets_list(quote_asset=None, order_by=None):
 
 
     # pairs with volume last 24h
-    pairs += get_quotation_pairs(exclude_pairs=[], max_pairs=100, from_time=yesterday, include_currencies=currencies)
-    pair_with_volume = [p['pair'] for p in pairs]
+    pairs += get_quotation_pairs(exclude_pairs=[], max_pairs=500, include_currencies=currencies)
 
-    # pairs without volume last 24h
-    pairs += get_quotation_pairs(exclude_pairs=pair_with_volume, max_pairs=100, include_currencies=currencies)
 
     base_assets  = [p['base_asset'] for p in pairs]
     quote_assets  = [p['quote_asset'] for p in pairs]
@@ -646,12 +643,71 @@ def get_sog_markets_list(quote_asset=None, order_by=None):
     supplies = get_assets_supply(all_assets)
 
     asset_with_image = {}
-    counter = 0;
+    counter = 0
 
     for pair in pairs:
         if counter < 50:
             if pair['base_asset'] in sogassets or pair['quote_asset'] in sogassets:
-                counter += 1
+                price, trend, price24h, progression = get_price_movement(pair['base_asset'], pair['quote_asset'], supplies=supplies)
+                market = {}
+                market['base_asset'] = pair['base_asset']
+                market['quote_asset'] = pair['quote_asset']
+                market['volume'] = pair['quote_quantity']
+                market['price'] = format(price, ".8f")
+                market['trend'] = trend
+                market['progression'] = format(progression, ".2f")
+                market['price_24h'] = format(price24h, ".8f")
+                market['supply'] = supplies[pair['base_asset']][0]
+                market['base_divisibility'] = supplies[pair['base_asset']][1]
+                market['quote_divisibility'] = supplies[pair['quote_asset']][1]
+                market['market_cap'] = format(D(market['supply']) * D(market['price']), ".4f")
+                market['with_image'] = True if pair['base_asset'] in asset_with_image else False
+                market_orders = []
+                buy_orders = []
+                sell_orders = []
+                asset1 = pair['base_asset']
+                asset2 = pair['quote_asset']
+                market_orders = get_market_orders(asset1, asset2)
+                for order in market_orders:
+                  if order['type'] == 'SELL':
+                     sell_orders.append(order)
+                  elif order['type'] == 'BUY':
+                     buy_orders.append(order)
+                market['buy_orders'] = buy_orders
+                market['sell_orders'] = sell_orders
+                markets.append(market)
+
+
+
+    for m in range(len(markets)):
+        markets[m]['pos'] = m + 1
+
+    return markets
+
+@cache.block_cache
+def get_sog_cardforcard_markets_list(quote_asset=None, order_by=None):
+
+    yesterday = int(time.time() - (24*60*60))
+    markets = []
+    pairs = []
+    currencies = sogassets
+
+
+    # pairs with volume last 24h
+    pairs += get_quotation_pairs(exclude_pairs=['BTC', 'XCP','BITCRYSTALS'], max_pairs=100, include_currencies=currencies)
+
+
+    base_assets  = [p['base_asset'] for p in pairs]
+    quote_assets  = [p['quote_asset'] for p in pairs]
+    all_assets = list(set(base_assets + quote_assets))
+    supplies = get_assets_supply(all_assets)
+
+    asset_with_image = {}
+    counter = 0
+
+    for pair in pairs:
+        if counter < 50:
+            if pair['base_asset'] in sogassets and pair['quote_asset'] in sogassets:
                 price, trend, price24h, progression = get_price_movement(pair['base_asset'], pair['quote_asset'], supplies=supplies)
                 market = {}
                 market['base_asset'] = pair['base_asset']
@@ -682,15 +738,10 @@ def get_sog_markets_list(quote_asset=None, order_by=None):
                 markets.append(market)
 
 
-    if order_by in ['price', 'progression', 'supply', 'market_cap', 'volume']:
-        markets = sorted(markets, key=lambda x: D(x[order_by]), reverse=True)
-    elif order_by in ['volume', 'base_asset']:
-        markets = sorted(markets, key=lambda x: x['order_by'])
 
     for m in range(len(markets)):
         markets[m]['pos'] = m + 1
 
     return markets
-
 
 
